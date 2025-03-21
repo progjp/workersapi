@@ -1,0 +1,69 @@
+name: Run Functional Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: '123456'
+    steps:
+      # Checkout your code
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          coverage: "none"
+          extensions: "json,couchbase-3.2.2,memcached,mongodb-1.12.0,redis,rdkafka,xsl,ldap,relay"
+          ini-values: date.timezone=UTC,memory_limit=-1,default_socket_timeout=10,session.gc_probability=0,apc.enable_cli=1,zend.assertions=1
+          php-version: "${{ matrix.php }}"
+          tools: pecl
+
+      - name: Display versions
+        run: |
+          php -r 'foreach (get_loaded_extensions() as $extension) echo $extension . " " . phpversion($extension) . PHP_EOL;'
+          php -i
+      # Prepare the environment and database
+      - name: Set environment for tests
+        working-directory: ./app
+        run: cp .env.example .env.test
+
+      - name: Set environment for prod
+        working-directory: ./app
+        run: cp .env.example .env
+
+      - name: Install dependencies
+        working-directory: ./app
+        run: |
+          COMPOSER_HOME="$(composer config home)"
+          ([ -d "$COMPOSER_HOME" ] || mkdir "$COMPOSER_HOME") && cp ../.github/composer-config.json "$COMPOSER_HOME/config.json"
+          export COMPOSER_ROOT_VERSION=$(grep ' VERSION = ' src/Symfony/Component/HttpKernel/Kernel.php | grep -P -o '[0-9]+\.[0-9]+')
+          echo COMPOSER_ROOT_VERSION=$COMPOSER_ROOT_VERSION >> $GITHUB_ENV
+          
+          echo "::group::composer update"
+          composer update --no-progress --ansi
+          echo "::endgroup::"
+
+      - name: Create Test Database
+        working-directory: ./app
+        run: php bin/console doctrine:database:create --if-not-exists --env=test
+
+      - name: Run tests
+        working-directory: ./app
+        run: ./bin/phpunit -v
+        env:
+          POSTGRES_HOST: localhost

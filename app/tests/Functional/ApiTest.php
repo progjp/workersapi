@@ -3,10 +3,12 @@
 namespace App\Tests\Functional;
 
 use App\Domain\Model\Employee;
+use DateTime;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Faker\Factory;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Doctrine\ORM\Tools\SchemaTool;
 
 final class ApiTest extends WebTestCase
 {
@@ -16,7 +18,7 @@ final class ApiTest extends WebTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()->get('doctrine.orm.entity_manager');
-        $schemaTool = new \Doctrine\ORM\Tools\SchemaTool($this->entityManager);
+        $schemaTool = new SchemaTool($this->entityManager);
         $metadata = $this->entityManager->getMetadataFactory()->getAllMetadata();
         $schemaTool->dropSchema($metadata);
         $schemaTool->createSchema($metadata);
@@ -48,7 +50,7 @@ final class ApiTest extends WebTestCase
         $requestJson = json_encode($fakerData, JSON_THROW_ON_ERROR);
         
         self::ensureKernelShutdown();
-        $client = static::createClient();
+        $client = self::createClient();
         $client->request(
             'POST',
             '/api/employee/',
@@ -108,7 +110,7 @@ final class ApiTest extends WebTestCase
         $requestJson = json_encode($fakerData, JSON_THROW_ON_ERROR);
         
         self::ensureKernelShutdown();
-        $client = static::createClient();
+        $client = self::createClient();
         $client->request(
             'PUT',
             '/api/employee/' . $testEntity->getId(),
@@ -157,7 +159,7 @@ final class ApiTest extends WebTestCase
         $this->entityManager->flush();
         
         self::ensureKernelShutdown();
-        $client = static::createClient();
+        $client = self::createClient();
         $client->request('GET', '/api/employee/' . $testEntity->getId());
         
         self::assertResponseStatusCodeSame(200);
@@ -176,8 +178,8 @@ final class ApiTest extends WebTestCase
         self::assertSame($email, $responseContent->email);
         self::assertSame($salary, (float)$responseContent->salary);
         self::assertSame($dateStart->format('Y-m-d'), new DateTimeImmutable($responseContent->date_start->date)->format('Y-m-d'));
-        self::assertSame(new \DateTime()->format('Y-m-d'), new DateTimeImmutable($responseContent->created_at->date)->format('Y-m-d'));
-        self::assertSame(new \DateTime()->format('Y-m-d'), new DateTimeImmutable($responseContent->updated_at->date)->format('Y-m-d'));
+        self::assertSame(new DateTime()->format('Y-m-d'), new DateTimeImmutable($responseContent->created_at->date)->format('Y-m-d'));
+        self::assertSame(new DateTime()->format('Y-m-d'), new DateTimeImmutable($responseContent->updated_at->date)->format('Y-m-d'));
         self::assertResponseIsSuccessful();
     }
     
@@ -201,7 +203,7 @@ final class ApiTest extends WebTestCase
         $this->entityManager->flush();
         
         self::ensureKernelShutdown();
-        $client = static::createClient();
+        $client = self::createClient();
         $client->request('DELETE', '/api/employee/' . $testEntity->getId());
         self::assertResponseStatusCodeSame(204);
         
